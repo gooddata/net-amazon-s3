@@ -154,7 +154,7 @@ no strict 'vars'
   my $bucket = $client->create_bucket(
     name                => $bucket_name,
     acl_short           => 'private',
-    location_constraint => 'US',
+    location_constraint => 'us-east-1',
   );
 
   # or use an existing bucket
@@ -195,7 +195,7 @@ may change.
   my $bucket = $client->create_bucket(
     name                => $bucket_name,
     acl_short           => 'private',
-    location_constraint => 'US',
+    location_constraint => 'us-east-1',
   );
 
 =head2 bucket

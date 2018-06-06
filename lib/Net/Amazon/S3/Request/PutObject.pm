@@ -6,7 +6,8 @@ extends 'Net::Amazon::S3::Request';
 
 # ABSTRACT: An internal class to put an object
 
-has 'bucket'    => ( is => 'ro', isa => 'BucketName',      required => 1 );
+with 'Net::Amazon::S3::Role::Bucket';
+
 has 'key'       => ( is => 'ro', isa => 'Str',             required => 1 );
 has 'value'     => ( is => 'ro', isa => 'Str|CodeRef|ScalarRef',     required => 1 );
 has 'acl_short' => ( is => 'ro', isa => 'Maybe[AclShort]', required => 0 );
@@ -27,13 +28,12 @@ sub http_request {
         $headers->{'x-amz-server-side-encryption'} = $self->encryption;
     }
 
-    return Net::Amazon::S3::HTTPRequest->new(
-        s3      => $self->s3,
+    return $self->_build_http_request(
         method  => 'PUT',
         path    => $self->_uri( $self->key ),
         headers => $self->headers,
         content => $self->value,
-    )->http_request;
+    );
 }
 
 1;

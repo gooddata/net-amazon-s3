@@ -291,7 +291,7 @@ sub get_options {
     my $help   = 0;
     my $man    = 0;
     my $force  = 0;
-    my $loc    = "US";
+    my $loc    = "us-east-1";
     my $bucket = "";
     GetOptions(
         \%args, "bucket=s", "jurisdiction=s",

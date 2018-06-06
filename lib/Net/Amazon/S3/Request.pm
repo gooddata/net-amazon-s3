@@ -9,7 +9,49 @@ use Regexp::Common qw /net/;
 
 enum 'AclShort' =>
     [ qw(private public-read public-read-write authenticated-read) ];
-enum 'LocationConstraint' => [ 'US', 'EU', 'eu-west-1', 'eu-central-1', 'us-west-1', 'us-west-2', 'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1', 'sa-east-1'  ];
+enum 'LocationConstraint' => [
+    # https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+    'ap-northeast-1',
+    'ap-northeast-2',
+    'ap-northeast-3',
+    'ap-south-1',
+    'ap-southeast-1',
+    'ap-southeast-2',
+    'ca-central-1',
+    'cn-north-1',
+    'cn-northwest-1',
+    'eu-central-1',
+    'eu-west-1',
+    'eu-west-2',
+    'eu-west-3',
+    'sa-east-1',
+    'us-east-1',
+    'us-east-2',
+    'us-west-1',
+    'us-west-2',
+];
+
+subtype 'MaybeLocationConstraint'
+    => as 'Maybe[LocationConstraint]'
+    ;
+
+# maintain backward compatiblity with 'US' and 'EU' values
+my %location_constraint_alias = (
+    US => 'us-east-1',
+    EU => 'eu-west-1',
+);
+
+enum 'LocationConstraintAlias' => [ keys %location_constraint_alias ];
+
+coerce 'LocationConstraint'
+    => from 'LocationConstraintAlias'
+    => via { $location_constraint_alias{$_} }
+    ;
+
+coerce 'MaybeLocationConstraint'
+    => from 'LocationConstraintAlias'
+    => via { $location_constraint_alias{$_} }
+    ;
 
 # To comply with Amazon S3 requirements, bucket names must:
 # Contain lowercase letters, numbers, periods (.), underscores (_), and dashes (-)
@@ -47,9 +89,27 @@ __PACKAGE__->meta->make_immutable;
 
 sub _uri {
     my ( $self, $key ) = @_;
+    my $bucket = $self->bucket->bucket;
+
     return (defined($key))
-        ? $self->bucket . "/" . (join '/', map {$self->s3->_urlencode($_)} split /\//, $key)
-        : $self->bucket . "/";
+        ? $bucket . "/" . (join '/', map {$self->s3->_urlencode($_)} split /\//, $key)
+        : $bucket . "/";
+}
+
+sub _build_signed_request {
+    my ($self, %params) = @_;
+
+    return Net::Amazon::S3::HTTPRequest->new(
+        %params,
+        s3 => $self->s3,
+        $self->can( 'bucket' ) ? (bucket => $self->bucket) : (),
+    );
+}
+
+sub _build_http_request {
+    my ($self, %params) = @_;
+
+    return $self->_build_signed_request( %params )->http_request;
 }
 
 1;

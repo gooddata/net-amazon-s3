@@ -8,7 +8,8 @@ use XML::LibXML;
 
 extends 'Net::Amazon::S3::Request';
 
-has 'bucket'    => ( is => 'ro', isa => 'BucketName', required => 1 );
+with 'Net::Amazon::S3::Role::Bucket';
+
 has 'key'       => ( is => 'ro', isa => 'Str',        required => 1 );
 has 'upload_id' => ( is => 'ro', isa => 'Str',        required => 1 );
 
@@ -18,11 +19,10 @@ sub http_request {
   my $self = shift;
 
   #build signed request
-  return Net::Amazon::S3::HTTPRequest->new(    #See patch below
-    s3      => $self->s3,
+  return $self->_build_http_request(
     method  => 'DELETE',
     path    => $self->_uri( $self->key ) . '?uploadId=' . $self->upload_id,
-  )->http_request;
+  );
 }
 
 1;

@@ -4,7 +4,8 @@ use Moose 0.85;
 use MooseX::StrictConstructor 0.16;
 extends 'Net::Amazon::S3::Request';
 
-has 'bucket' => ( is => 'ro', isa => 'BucketName', required => 1 );
+with 'Net::Amazon::S3::Role::Bucket';
+
 has 'key'    => ( is => 'ro', isa => 'Str',        required => 1 );
 has 'method' => ( is => 'ro', isa => 'HTTPMethod', required => 1 );
 
@@ -15,11 +16,10 @@ __PACKAGE__->meta->make_immutable;
 sub http_request {
     my $self = shift;
 
-    return Net::Amazon::S3::HTTPRequest->new(
-        s3     => $self->s3,
+    return $self->_build_http_request(
         method => $self->method,
         path   => $self->_uri( $self->key ),
-    )->http_request;
+    );
 }
 
 sub query_string_authentication_uri {
@@ -28,8 +28,7 @@ sub query_string_authentication_uri {
     my $uri = URI->new( $self->_uri( $self->key ) );
     $uri->query_form( %$query_form ) if $query_form;
 
-    return Net::Amazon::S3::HTTPRequest->new(
-        s3     => $self->s3,
+    return $self->_build_signed_request(
         method => $self->method,
         path   => $uri->as_string,
     )->query_string_authentication_uri($expires);

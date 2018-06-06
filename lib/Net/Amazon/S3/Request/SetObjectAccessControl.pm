@@ -6,7 +6,8 @@ extends 'Net::Amazon::S3::Request';
 
 # ABSTRACT: An internal class to set an object's access control
 
-has 'bucket'    => ( is => 'ro', isa => 'BucketName',      required => 1 );
+with 'Net::Amazon::S3::Role::Bucket';
+
 has 'key'       => ( is => 'ro', isa => 'Str',             required => 1 );
 has 'acl_short' => ( is => 'ro', isa => 'Maybe[AclShort]', required => 0 );
 has 'acl_xml'   => ( is => 'ro', isa => 'Maybe[Str]',      required => 0 );
@@ -30,13 +31,12 @@ sub http_request {
         : {};
     my $xml = $self->acl_xml || '';
 
-    return Net::Amazon::S3::HTTPRequest->new(
-        s3      => $self->s3,
+    return $self->_build_http_request(
         method  => 'PUT',
         path    => $self->_uri( $self->key ) . '?acl',
         headers => $headers,
         content => $xml,
-    )->http_request;
+    );
 }
 
 1;

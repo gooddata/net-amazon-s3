@@ -7,7 +7,8 @@ extends 'Net::Amazon::S3::Request';
 
 # ABSTRACT: An internal class to list a bucket
 
-has 'bucket'    => ( is => 'ro', isa => 'BucketName', required => 1 );
+with 'Net::Amazon::S3::Role::Bucket';
+
 has 'prefix'    => ( is => 'ro', isa => 'Maybe[Str]', required => 0 );
 has 'delimiter' => ( is => 'ro', isa => 'Maybe[Str]', required => 0 );
 has 'max_keys' =>
@@ -19,7 +20,7 @@ __PACKAGE__->meta->make_immutable;
 sub http_request {
     my $self = shift;
 
-    my $path = $self->bucket . "/";
+    my $path = $self->_uri;
 
     my @post;
     foreach my $method ( qw(prefix delimiter max_keys marker) ) {
@@ -33,11 +34,10 @@ sub http_request {
         $path .= '?' . join( '&', @post );
     }
 
-    return Net::Amazon::S3::HTTPRequest->new(
-        s3     => $self->s3,
+    return $self->_build_http_request(
         method => 'GET',
         path   => $path,
-    )->http_request;
+    );
 }
 
 sub _urlencode {

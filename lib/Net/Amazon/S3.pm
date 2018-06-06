@@ -107,6 +107,7 @@ Development of this code happens here: https://github.com/rustyconover/net-amazo
 
 use Carp;
 use Digest::HMAC_SHA1;
+use Scalar::Util;
 
 use Net::Amazon::S3::Bucket;
 use Net::Amazon::S3::Client;
@@ -132,6 +133,8 @@ use Net::Amazon::S3::Request::PutObject;
 use Net::Amazon::S3::Request::PutPart;
 use Net::Amazon::S3::Request::SetBucketAccessControl;
 use Net::Amazon::S3::Request::SetObjectAccessControl;
+use Net::Amazon::S3::Signature::V2;
+use Net::Amazon::S3::Signature::V4;
 use LWP::UserAgent::Determined;
 use URI::Escape qw(uri_escape_utf8);
 use XML::LibXML;
@@ -144,12 +147,24 @@ has 'secure' => ( is => 'ro', isa => 'Bool', required => 0, default => 0 );
 has 'timeout' => ( is => 'ro', isa => 'Num',  required => 0, default => 30 );
 has 'retry'   => ( is => 'ro', isa => 'Bool', required => 0, default => 0 );
 has 'host'    => ( is => 'ro', isa => 'Str',  required => 0, default => 's3.amazonaws.com' );
-has 'use_virtual_host' => ( is => 'rw', isa => 'Bool', required => 0, default => 0 );
+has 'use_virtual_host' => (
+    is => 'ro',
+    isa => 'Bool',
+    required => 0,
+    lazy => 1,
+    default => sub { $_[0]->authorization_method->enforce_use_virtual_host },
+);
 has 'libxml' => ( is => 'rw', isa => 'XML::LibXML',    required => 0 );
 has 'ua'     => ( is => 'rw', isa => 'LWP::UserAgent', required => 0 );
 has 'err'    => ( is => 'rw', isa => 'Maybe[Str]',     required => 0 );
 has 'errstr' => ( is => 'rw', isa => 'Maybe[Str]',     required => 0 );
 has 'aws_session_token' => ( is => 'rw', isa => 'Str', required => 0 );
+has authorization_method => (
+    is => 'ro',
+    isa => 'Str',
+    required => 0,
+    default => 'Net::Amazon::S3::Signature::V4',
+);
 
 __PACKAGE__->meta->make_immutable;
 
@@ -360,9 +375,13 @@ Returns an (unverified) bucket object from an account. Does no network access.
 =cut
 
 sub bucket {
-    my ( $self, $bucketname ) = @_;
+    my ( $self, $bucket ) = @_;
+
+    return $bucket
+        if Scalar::Util::blessed( $bucket ) && $bucket->isa( 'Net::Amazon::S3::Bucket' );
+
     return Net::Amazon::S3::Bucket->new(
-        { bucket => $bucketname, account => $self } );
+        { bucket => $bucket, account => $self } );
 }
 
 =head2 delete_bucket

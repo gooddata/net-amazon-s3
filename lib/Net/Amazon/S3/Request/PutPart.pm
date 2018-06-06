@@ -4,7 +4,8 @@ use Moose 0.85;
 use MooseX::StrictConstructor 0.16;
 extends 'Net::Amazon::S3::Request';
 
-has 'bucket'        => ( is => 'ro', isa => 'BucketName',      required => 1 );
+with 'Net::Amazon::S3::Role::Bucket';
+
 has 'key'           => ( is => 'ro', isa => 'Str',             required => 1 );
 has 'value'         => ( is => 'ro', isa => 'Str|CodeRef|ScalarRef',     required => 0 );
 has 'upload_id'     => ( is => 'ro', isa => 'Str',             required => 1 );
@@ -30,8 +31,7 @@ sub http_request {
             $self->copy_source_bucket.'/'.$self->copy_source_key;
     }
 
-    return Net::Amazon::S3::HTTPRequest->new(
-        s3      => $self->s3,
+    return $self->_build_http_request(
         method  => 'PUT',
         path    => $self->_uri($self->key) .
                    '?partNumber=' .
@@ -40,7 +40,7 @@ sub http_request {
                    $self->upload_id,
         headers => $headers,
         content => scalar( defined( $self->value ) ? $self->value : '' ),
-    )->http_request;
+    );
 }
 
 1;

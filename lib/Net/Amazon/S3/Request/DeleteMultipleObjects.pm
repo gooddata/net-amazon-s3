@@ -9,7 +9,8 @@ extends 'Net::Amazon::S3::Request';
 
 # ABSTRACT: An internal class to delete multiple objects
 
-has 'bucket' => ( is => 'ro', isa => 'BucketName', required => 1 );
+with 'Net::Amazon::S3::Role::Bucket';
+
 has 'keys'    => ( is => 'ro', isa => 'ArrayRef[Str]', required => 1 );
 __PACKAGE__->meta->make_immutable;
 
@@ -43,13 +44,12 @@ sub http_request {
         'Content-Length' => length($delete_content),
     };
 
-    return Net::Amazon::S3::HTTPRequest->new(
-        s3     => $self->s3,
+    return $self->_build_http_request(
         method => 'POST',
         path   => $self->_uri() . "?delete",
         headers => $conf,
         content => $delete_content,
-    )->http_request;
+    );
 }
 
 1;

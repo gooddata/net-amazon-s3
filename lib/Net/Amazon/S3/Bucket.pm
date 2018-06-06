@@ -10,6 +10,12 @@ has 'account' => ( is => 'ro', isa => 'Net::Amazon::S3', required => 1 );
 has 'bucket'  => ( is => 'ro', isa => 'Str',             required => 1 );
 has 'creation_date' => ( is => 'ro', isa => 'Maybe[Str]', required => 0 );
 
+has 'region' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub { $_[0]->get_location_constraint },
+);
+
 __PACKAGE__->meta->make_immutable;
 
 # ABSTRACT: convenience object for working with Amazon S3 buckets
@@ -278,6 +284,26 @@ sub head_key {
     return $self->get_key( $key, "HEAD" );
 }
 
+=head2 query_string_authentication_uri KEY, EXPIRES_AT
+
+Takes key and expiration time (epoch time) and returns uri signed
+with query parameter
+
+=cut
+
+sub query_string_authentication_uri {
+    my ( $self, $key, $expires_at ) = @_;
+
+    my $request = Net::Amazon::S3::Request::GetObject->new(
+        s3     => $self->account,
+        bucket => $self,
+        key    => $key,
+        method => 'GET',
+    );
+
+    return $request->query_string_authentication_uri( $expires_at );
+}
+
 =head2 get_key $key_name [$method]
 
 Takes a key name and an optional HTTP method (which defaults to C<GET>.
@@ -363,6 +389,37 @@ Returns true on success and false on failure
 =cut
 
 # returns bool
+sub delete_multi_object {
+    my $self = shift;
+    my @objects = @_;
+    return unless( scalar(@objects) );
+
+    # Since delete can handle up to 1000 requests, be a little bit nicer
+    # and slice up requests and also allow keys to be strings
+    # rather than only objects.
+    my $last_result;
+    while (scalar(@objects) > 0) {
+        my $http_request = Net::Amazon::S3::Request::DeleteMultiObject->new(
+            s3      => $self->account,
+            bucket  => $self,
+            keys    => [map {
+                if (ref($_)) {
+                    $_->key
+                } else {
+                    $_
+                }
+            } splice @objects, 0, ((scalar(@objects) > 1000) ? 1000 : scalar(@objects))]
+        )->http_request;
+
+        my $xpc = $self->account->_send_request($http_request);
+
+        return undef
+            unless $xpc && !$self->account->_remember_errors($xpc);
+    }
+
+    return 1;
+}
+
 sub delete_key {
     my ( $self, $key ) = @_;
     croak 'must specify key' unless defined $key && length $key;
@@ -558,8 +615,12 @@ sub get_location_constraint {
     return undef unless $xpc && !$self->account->_remember_errors($xpc);
 
     my $lc = $xpc->findvalue("//s3:LocationConstraint");
+
+    # S3 documentation: https://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGETlocation.html
+    # When the bucket's region is US East (N. Virginia),
+    # Amazon S3 returns an empty string for the bucket's region
     if ( defined $lc && $lc eq '' ) {
-        $lc = undef;
+        $lc = 'us-east-1';
     }
     return $lc;
 }
